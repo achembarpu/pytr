@@ -787,7 +787,7 @@ class Event:
             and eventTypeStr not in ["BENEFITS_SPARE_CHANGE_EXECUTION"]
         ):
             get_event_logger().warning("Could not parse fees from %s", eventdesc)
-            get_event_logger().debug("Failed to parse fees from %s", json.dumps(event_dict, indent=4))
+            get_event_logger().debug("Failed to parse fees from %s", format_debug_payload(event_dict))
 
         if (
             shares is None
@@ -808,7 +808,7 @@ class Event:
             and subtitle not in ["Aktienprämiendividende", "Bardividende korrigiert", "Dividende Wahlweise", "Tilgung"]
         ):
             get_event_logger().warning("Could not parse shares from %s", eventdesc)
-            get_event_logger().debug("Failed to parse shares from: %s", json.dumps(event_dict, indent=4))
+            get_event_logger().debug("Failed to parse shares from: %s", format_debug_payload(event_dict))
 
         return cls(event_type, date, title, isin, isin2, shares, shares2, value, fees, taxes, note)
 
