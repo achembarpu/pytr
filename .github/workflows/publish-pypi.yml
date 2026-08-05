@@ -29,13 +29,13 @@ jobs:
           version: ${{ env.UV_VERSION }}
           python-version: ${{ matrix.python-version }}
       - name: Pytest
-        run: uv run pytest
+        run: uv run --locked pytest
       - name: Ruff check
         run: uvx ruff@0.9.6 check
       - name: Ruff format
         run: uvx ruff@0.9.6 format --check --diff
       - name: Mypy type check
-        run: uv run mypy .
+        run: uv run --locked mypy .
       - name: Check if README.md automatically generated content is up to date
         run: diff -u <(cat README.md | sed -z '$s/\n*$//') <(uvx mksync@0.1.5 README.md | sed -z '$s/\n*$//')
 
