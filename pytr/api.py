@@ -183,14 +183,14 @@ class TradeRepublicApi:
         self.log.info("Retrieving AWS WAF token using awswaf...")
         try:
             session = cffi_requests.Session(impersonate="chrome")
-            response = session.get(self._waf_login_url)
+            response = session.get(self._waf_login_url, timeout=(10, 30))
             m = re.search(r'src="(https://[^"]+/challenge\.js)"', response.text)
             if not m:
                 self.log.warning("AWS WAF token not acquired. challenge.js URL not found in login page.")
                 return None
             challenge_js_url = m.group(1)
             waf_endpoint = challenge_js_url.split("https://", 1)[1].rsplit("/challenge.js", 1)[0]
-            challenge_js = session.get(challenge_js_url).text
+            challenge_js = session.get(challenge_js_url, timeout=(10, 30)).text
             token = AwsWaf(waf_endpoint, "app.traderepublic.com", challenge_js)()
         except Exception:
             self.log.error("Failed to get AWS WAF token.")
