@@ -135,7 +135,8 @@ class TransactionExporter:
         }
 
         if event.event_type == ConditionalEventType.TRADE_INVOICE:
-            assert event.value is not None, event
+            if event.value is None:
+                raise ValueError(f"TRADE_INVOICE event requires a value, got None: {event}")
             ev_value = event.value
             if event.shares2:
                 kwargs2 = kwargs.copy()
@@ -159,7 +160,8 @@ class TransactionExporter:
         # With saveback, a small amount already invested into a savings plans is invested again, effectively representing
         # a deposit (you get money from Trade Republic) and then a buy of the related asset.
         elif event.event_type == ConditionalEventType.SAVEBACK:
-            assert event.value is not None, event
+            if event.value is None:
+                raise ValueError(f"SAVEBACK event requires a value, got None: {event}")
             kwargs["type"] = self._translate(PPEventType.BUY.value)
             yield self._localize_keys(kwargs)
 
@@ -169,7 +171,8 @@ class TransactionExporter:
             kwargs["isin"] = None
             kwargs["shares"] = None
         elif event.event_type == ConditionalEventType.PRIVATE_MARKETS_ORDER:
-            assert event.value is not None, event
+            if event.value is None:
+                raise ValueError(f"PRIVATE_MARKETS_ORDER event requires a value, got None: {event}")
             kwargs["type"] = self._translate((PPEventType.BUY if event.value < 0 else PPEventType.SELL).value)
             if event.note == "1 % Bonus":
                 yield self._localize_keys(kwargs)
