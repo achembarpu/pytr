@@ -28,6 +28,9 @@ import os
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
+# This key is a non-secret static protocol constant embedded in the AWS WAF
+# challenge.js flow (not a user credential). Do not treat it as a secret to
+# rotate or protect.
 key = bytes.fromhex("6f71a512b1e035eaab53d8be73120d3fb68a0ca346b9560aab3e5cdf753d5e98")
 aesgcm = AESGCM(key)
 

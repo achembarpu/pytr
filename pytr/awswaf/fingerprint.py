@@ -24,13 +24,15 @@
 #
 
 import json
-import random
+import secrets
 import time
 import uuid
 import zlib
 from pathlib import Path
 
 from .crypto import encrypt
+
+_rand = secrets.SystemRandom()
 
 _WEBGL_JSON = Path(__file__).parent / "webgl.json"
 gpus = json.loads(_WEBGL_JSON.read_text())
@@ -46,10 +48,10 @@ def encode_with_crc(obj):
 
 def get_fp(user_agent: str):
     ts = int(time.time() * 1000)
-    gpu = random.choice(gpus)
+    gpu = _rand.choice(gpus)
 
-    bins = [random.randrange(0, 40) for _ in range(256)]
-    bins[0], bins[-1] = random.randrange(14473, 16573), random.randrange(14473, 16573)
+    bins = [_rand.randrange(0, 40) for _ in range(256)]
+    bins[0], bins[-1] = _rand.randrange(14473, 16573), _rand.randrange(14473, 16573)
 
     fp = {
         "metrics": {
@@ -99,11 +101,11 @@ def get_fp(user_agent: str):
             },
             "js": {
                 "audio": True,
-                "geolocation": random.choice([True, False]),
+                "geolocation": _rand.choice([True, False]),
                 "localStorage": "supported",
                 "touch": False,
                 "video": True,
-                "webWorker": random.choice([True, False]),
+                "webWorker": _rand.choice([True, False]),
             },
             "elapsed": 1,
         },
@@ -134,7 +136,7 @@ def get_fp(user_agent: str):
             "getRandomValues": True,
             "randomUUID": True,
         },
-        "canvas": {"hash": random.randrange(645172295, 735192295), "emailHash": None, "histogramBins": bins},
+        "canvas": {"hash": _rand.randrange(645172295, 735192295), "emailHash": None, "histogramBins": bins},
         "formDetected": False,
         "numForms": 0,
         "numFormElements": 0,

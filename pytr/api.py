@@ -874,22 +874,34 @@ class TradeRepublicApi:
         return data
 
     def order_cost(self, isin, exchange, order_mode, order_type, size, sell_fractions):
-        return requests.request(
+        resp = requests.request(
             method="GET",
             url=f"{self._host}/api/v1/user/costtransparency?instrumentId={isin}&exchangeId={exchange}&mode={order_mode}&type={order_type}&size={size}&sellFractions={sell_fractions}",
             data=None,
             headers=self._default_headers,
             timeout=(10, 30),
-        ).text
+        )
+        if len(resp.content) > 10 * 1024 * 1024:
+            raise ValueError(
+                "cost transparency response exceeds the 10 MiB safety limit "
+                f"({len(resp.content)} bytes); aborting to avoid unbounded body reads"
+            )
+        return resp.text
 
     def savings_plan_cost(self, isin, amount, interval):
-        return requests.request(
+        resp = requests.request(
             method="GET",
             url=f"{self._host}/api/v1/user/savingsplancosttransparency?instrumentId={isin}&amount={amount}&interval={interval}",
             data=None,
             headers=self._default_headers,
             timeout=(10, 30),
-        ).text
+        )
+        if len(resp.content) > 10 * 1024 * 1024:
+            raise ValueError(
+                "savings plan cost transparency response exceeds the 10 MiB safety limit "
+                f"({len(resp.content)} bytes); aborting to avoid unbounded body reads"
+            )
+        return resp.text
 
     def __getattr__(self, name):
         if name[:9] == "blocking_":

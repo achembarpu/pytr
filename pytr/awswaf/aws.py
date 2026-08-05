@@ -24,13 +24,15 @@
 #
 
 import json
-import random
 import re
+import secrets
 
 from curl_cffi import requests
 
 from .fingerprint import get_fp
 from .verify import CHALLENGE_SOLVERS
+
+_rand = secrets.SystemRandom()
 
 
 def parse_challenge_js(js_text: str) -> dict:
@@ -156,7 +158,7 @@ class AwsWaf:
             "client": "Browser",
             "domain": self.domain,
             "metrics": [
-                {"name": "2", "value": random.uniform(0, 1), "unit": "2"},
+                {"name": "2", "value": _rand.uniform(0, 1), "unit": "2"},
                 {"name": "100", "value": 0, "unit": "2"},
                 {"name": "101", "value": 0, "unit": "2"},
                 {"name": "102", "value": 0, "unit": "2"},
@@ -173,11 +175,11 @@ class AwsWaf:
                 {"name": "undefined", "value": 0, "unit": "2"},
                 {"name": "3", "value": 4, "unit": "2"},
                 {"name": "7", "value": 0, "unit": "4"},
-                {"name": "1", "value": random.uniform(10, 20), "unit": "2"},
+                {"name": "1", "value": _rand.uniform(10, 20), "unit": "2"},
                 {"name": "4", "value": 36.5, "unit": "2"},
-                {"name": "5", "value": random.uniform(0, 1), "unit": "2"},
-                {"name": "6", "value": random.uniform(50, 60), "unit": "2"},
-                {"name": "0", "value": random.uniform(130, 140), "unit": "2"},
+                {"name": "5", "value": _rand.uniform(0, 1), "unit": "2"},
+                {"name": "6", "value": _rand.uniform(50, 60), "unit": "2"},
+                {"name": "0", "value": _rand.uniform(130, 140), "unit": "2"},
                 {"name": "8", "value": 1, "unit": "4"},
             ],
         }
