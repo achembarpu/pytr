@@ -27,6 +27,7 @@ dependencies = [
     "coloredlogs",
     "cryptography",
     "curl_cffi",
+    "keyring",
     "packaging",
     "pathvalidate",
     "playwright",

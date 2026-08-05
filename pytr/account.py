@@ -6,7 +6,14 @@ from getpass import getpass
 
 from pygments import formatters, highlight, lexers
 
-from .api import BASE_DIR, CREDENTIALS_FILE, TradeRepublicApi
+from .api import (
+    BASE_DIR,
+    CREDENTIALS_FILE,
+    TradeRepublicApi,
+    _delete_credentials_file,
+    _read_credentials_from_keyring,
+    _store_credentials_to_keyring,
+)
 from .utils import get_logger
 
 
@@ -26,33 +33,51 @@ def login(phone_no=None, pin=None, store_credentials=False, waf_token="playwrigh
     """
     log = get_logger(__name__)
     save_cookies = True
+    read_from_stored = False
 
-    if phone_no is None and CREDENTIALS_FILE.is_file():
-        with open(CREDENTIALS_FILE) as f:
-            lines = f.readlines()
-        phone_no = lines[0].strip()
-        pin = lines[1].strip()
-        phone_no_masked = phone_no[:-8] + "********"
-        pin_masked = len(pin) * "*"
-        log.info(f"Using credentials from file {CREDENTIALS_FILE}. Phone: {phone_no_masked}, PIN: {pin_masked}")
-    else:
-        BASE_DIR.mkdir(parents=True, exist_ok=True)
-        if phone_no is None:
-            print("Please enter your TradeRepublic phone number in the format +4912345678:")
-            phone_no = input()
+    if phone_no is None:
+        # Try the system keyring first, then fall back to the legacy file.
+        keyring_creds = _read_credentials_from_keyring()
+        if keyring_creds is not None:
+            phone_no, pin = keyring_creds
+            phone_no_masked = phone_no[:-8] + "********"
+            pin_masked = len(pin) * "*"
+            log.debug("Using credentials from system keyring. Phone: %s, PIN: %s", phone_no_masked, pin_masked)
+            read_from_stored = True
+        elif CREDENTIALS_FILE.is_file():
+            with open(CREDENTIALS_FILE) as f:
+                lines = f.readlines()
+            phone_no = lines[0].strip()
+            pin = lines[1].strip()
+            phone_no_masked = phone_no[:-8] + "********"
+            pin_masked = len(pin) * "*"
+            log.debug("Using credentials from legacy file %s. Phone: %s, PIN: %s", CREDENTIALS_FILE, phone_no_masked, pin_masked)
+            read_from_stored = True
 
-        if pin is None:
-            print("Please enter your TradeRepublic pin:")
-            pin = getpass(prompt="Pin (Input is hidden):")
+    BASE_DIR.mkdir(parents=True, exist_ok=True)
+    if phone_no is None:
+        print("Please enter your TradeRepublic phone number in the format +4912345678:")
+        phone_no = input()
 
+    if pin is None:
+        print("Please enter your TradeRepublic pin:")
+        pin = getpass(prompt="Pin (Input is hidden):")
+
+    if read_from_stored or store_credentials:
         if store_credentials:
-            with open(CREDENTIALS_FILE, "w") as f:
-                f.writelines([phone_no + "\n", pin + "\n"])
-            os.chmod(CREDENTIALS_FILE, 0o600)
-
-            log.info(f"Storing credentials/cookies in {BASE_DIR}")
-        else:
-            save_cookies = False
+            stored = _store_credentials_to_keyring(phone_no, pin)
+            if stored:
+                log.info("Stored credentials in system keyring (cookies: %s)", BASE_DIR)
+                # Migration: remove the legacy plaintext file if it exists.
+                _delete_credentials_file()
+            else:
+                log.warning("Keyring unavailable, falling back to legacy credentials file")
+                with open(CREDENTIALS_FILE, "w") as f:
+                    f.writelines([phone_no + "\n", pin + "\n"])
+                os.chmod(CREDENTIALS_FILE, 0o600)
+                log.info("Storing credentials/cookies in %s", BASE_DIR)
+    else:
+        save_cookies = False
 
     tr = TradeRepublicApi(phone_no=phone_no, pin=pin, save_cookies=save_cookies, waf_token=waf_token)
 

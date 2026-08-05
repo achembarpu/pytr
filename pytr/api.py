@@ -31,7 +31,7 @@ import time
 import urllib.parse
 import uuid
 from http.cookiejar import Cookie, MozillaCookieJar
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Tuple
 
 import certifi
 import requests
@@ -46,6 +46,67 @@ home = pathlib.Path.home()
 BASE_DIR = home / ".pytr"
 CREDENTIALS_FILE = BASE_DIR / "credentials"
 COOKIES_FILE = BASE_DIR / "cookies.txt"
+
+# --- Keyring credential storage ---
+#
+# Keyring scheme:
+#   Service name: "pytr"
+#   Two password entries stored under the same service:
+#     username="phone"  → phone number (e.g. "+4912345678")
+#     username="pin"    → PIN
+#
+# On first store, any legacy plaintext file at ~/.pytr/credentials is deleted
+# (migration).  If the system keyring is unavailable (no backend, locked, or
+# any other KeyringError), reads and writes fall back to the legacy file with
+# a warning.
+
+KEYRING_SERVICE = "pytr"
+
+try:
+    import keyring  # noqa: F811 — imported inside try for graceful degradation
+    import keyring.errors  # noqa: F811
+except ImportError:
+    keyring = None  # type: ignore[assignment]
+
+
+def _read_credentials_from_keyring() -> Optional[Tuple[str, str]]:
+    """Read phone_no and pin from the system keyring.
+
+    Returns ``(phone_no, pin)`` on success, ``None`` if no credentials are
+    stored or if the ``keyring`` library is not installed.
+    """
+    if keyring is None:
+        return None
+    try:
+        phone_no = keyring.get_password(KEYRING_SERVICE, "phone")
+        pin = keyring.get_password(KEYRING_SERVICE, "pin")
+    except keyring.errors.KeyringError:
+        return None
+    if phone_no and pin:
+        return (phone_no, pin)
+    return None
+
+
+def _store_credentials_to_keyring(phone_no: str, pin: str) -> bool:
+    """Store *phone_no* and *pin* in the system keyring.
+
+    Returns ``True`` on success, ``False`` if the keyring backend is
+    unavailable or the library is not installed.
+    """
+    if keyring is None:
+        return False
+    try:
+        keyring.set_password(KEYRING_SERVICE, "phone", phone_no)
+        keyring.set_password(KEYRING_SERVICE, "pin", pin)
+    except keyring.errors.KeyringError:
+        return False
+    return True
+
+
+def _delete_credentials_file() -> None:
+    """Remove the legacy plaintext credentials file if it exists."""
+    if CREDENTIALS_FILE.exists():
+        CREDENTIALS_FILE.unlink()
 
 
 class TradeRepublicApi:
@@ -85,13 +146,20 @@ class TradeRepublicApi:
         self._credentials_file = pathlib.Path(credentials_file) if credentials_file else CREDENTIALS_FILE
 
         if not (phone_no and pin):
-            try:
-                with open(self._credentials_file, "r") as f:
-                    lines = f.readlines()
-                self.phone_no = lines[0].strip()
-                self.pin = lines[1].strip()
-            except FileNotFoundError:
-                raise ValueError(f"phone_no and pin must be specified explicitly or via {self._credentials_file}")
+            # Try the system keyring first, then fall back to the legacy file.
+            keyring_creds = _read_credentials_from_keyring()
+            if keyring_creds is not None:
+                self.phone_no, self.pin = keyring_creds
+                self.log.debug("Read credentials from system keyring")
+            else:
+                try:
+                    with open(self._credentials_file, "r") as f:
+                        lines = f.readlines()
+                    self.phone_no = lines[0].strip()
+                    self.pin = lines[1].strip()
+                    self.log.debug("Read credentials from legacy file %s", self._credentials_file)
+                except FileNotFoundError:
+                    raise ValueError(f"phone_no and pin must be specified explicitly or via {self._credentials_file}")
         else:
             self.phone_no = phone_no
             self.pin = pin
