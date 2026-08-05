@@ -216,7 +216,7 @@ class TradeRepublicApi:
             self.log.info("Using WAF token from arguments.")
 
         if self._waf_token:
-            self.log.debug(f"WAF Token: {self._waf_token}")
+            self.log.debug("WAF token acquired (length=%d)", len(self._waf_token or ""))
             self._set_waf_cookie(self._waf_token)
         else:
             self.log.warning("No WAF token available.")
@@ -228,7 +228,7 @@ class TradeRepublicApi:
         self.log.debug(f"Web login returned: {r.status_code}")
         r.raise_for_status()
         j = r.json()
-        self.log.debug(f"Web login data: {json.dumps(j, indent=4)}")
+        self.log.debug("Web login response received with top-level keys: %s", sorted(j.keys()))
         try:
             self._process_id = j["processId"]
         except KeyError:

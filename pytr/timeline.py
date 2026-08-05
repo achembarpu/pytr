@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 
 from .api import TradeRepublicError
-from .utils import get_logger, preview
+from .utils import format_debug_payload, get_logger, preview
 
 MAX_EVENT_REQUEST_BATCH = 1000
 
@@ -222,7 +222,7 @@ class Timeline:
                     f"{self.received_detail + self.skipped_detail:>{self.detail_digits}}/{self.all_detail}: "
                     + f"{event['title']} -- {event['subtitle']} - {event['timestamp'][:19]} {msg}"
                 )
-                self.log.debug("%s: %s", msg, json.dumps(event, indent=2))
+                self.log.debug("%s: %s", msg, format_debug_payload(event))
 
             if self.requested_detail % MAX_EVENT_REQUEST_BATCH == 0 and (
                 (self.received_detail + self.skipped_detail) < self.requested_detail

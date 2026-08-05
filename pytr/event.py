@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 from babel.numbers import NumberFormatError, parse_decimal
 
-from .utils import get_logger
+from .utils import format_debug_payload, get_logger
 
 
 class EventType(Enum):
@@ -590,7 +590,7 @@ class Event:
 
             if not ignoreEvent:
                 get_event_logger().warning(f'Ignoring unknown event "{eventdesc}"')
-                get_event_logger().debug("Unknown event %s: %s", eventdesc, json.dumps(event_dict, indent=4))
+                get_event_logger().debug("Unknown event %s: %s", eventdesc, format_debug_payload(event_dict))
 
         # Return an empty Event object if we don't have an event type, as we can't parse the rest of the fields without it
         if event_type is None:

@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 
 import coloredlogs  # type: ignore[import-untyped]
 import requests
@@ -95,6 +96,36 @@ def get_logger(name=__name__, verbosity=None, debug_file=None, debug_filter=None
     )
 
     return logger
+
+
+def debug_raw_enabled():
+    """
+    Whether full (unredacted) debug payload logging is enabled.
+
+    Full raw payloads may contain sensitive data (amounts, account IDs, PII),
+    so they are only logged when the operator explicitly opts in via the
+    ``PYTR_DEBUG_RAW=1`` environment variable.
+    """
+    return os.environ.get("PYTR_DEBUG_RAW") == "1"
+
+
+def format_debug_payload(payload):
+    """
+    Format a payload for debug logging without leaking sensitive data.
+
+    When :func:`debug_raw_enabled` is set, the full JSON payload is returned.
+    Otherwise a redacted summary is returned: only top-level keys and their
+    types (plus the ``id`` value if present) are shown, omitting amounts,
+    account IDs, and other PII.
+    """
+    if debug_raw_enabled():
+        return json.dumps(payload, indent=2)
+    if isinstance(payload, dict):
+        summary = {k: f"<{type(v).__name__}>" for k, v in payload.items()}
+        if "id" in payload:
+            summary["id"] = payload["id"]
+        return json.dumps(summary, indent=2)
+    return f"<{type(payload).__name__}>"
 
 
 def preview(response, num_lines=5):
