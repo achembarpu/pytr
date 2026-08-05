@@ -61,7 +61,8 @@ def login(phone_no=None, pin=None, store_credentials=False, waf_token="playwrigh
         try:
             countdown = tr.initiate_weblogin()
         except ValueError as e:
-            log.fatal(str(e))
+            log.error("Login failed: API returned an unexpected response (%s)", type(e).__name__)
+            log.debug("Login error details: %s", e)
             sys.exit(1)
         request_time = time.time()
         print("Enter the code you received to your mobile app as a notification.")

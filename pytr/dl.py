@@ -504,7 +504,8 @@ class DL:
             try:
                 r = future.result()
             except Exception as e:
-                self.log.fatal(str(e))
+                self.log.error("Download failed: API returned an unexpected response (%s)", type(e).__name__)
+                self.log.debug("Download error details: %s", e)
                 continue
 
             future.filepath.parent.mkdir(parents=True, exist_ok=True)  # type: ignore[attr-defined]

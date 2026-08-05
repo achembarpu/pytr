@@ -13,5 +13,6 @@ if __name__ == "__main__":
         sys.exit()
     except Exception as e:
         log = logging.getLogger(__name__)
-        log.fatal(e)
-        raise
+        log.error("An unexpected error occurred (%s)", type(e).__name__)
+        log.debug("Error details: %s", e)
+        sys.exit(1)
