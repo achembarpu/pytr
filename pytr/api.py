@@ -21,6 +21,7 @@
 # SOFTWARE.
 
 import asyncio
+import functools
 import json
 import pathlib
 import re
@@ -99,6 +100,9 @@ class TradeRepublicApi:
 
         self._websession = requests.Session()
         self._websession.headers = self._default_headers
+        # Apply a default connect/read timeout to every request made through the
+        # session so outbound calls cannot hang indefinitely (CWE-1088/CWE-400).
+        self._websession.request = functools.partial(self._websession.request, timeout=(10, 30))
         if self._save_cookies:
             self._websession.cookies = MozillaCookieJar(self._cookies_file)
         self._sec_acc_no: str | None = None
@@ -778,6 +782,7 @@ class TradeRepublicApi:
             url=f"{self._host}/api/v1/payout",
             data={"amount": amount},
             headers=self._default_headers,
+            timeout=(10, 30),
         ).json()
 
     def confirm_payout(self, process_id, code):
@@ -786,6 +791,7 @@ class TradeRepublicApi:
             url=f"{self._host}/api/v1/payout/{process_id}/code",
             data={"code": code},
             headers=self._default_headers,
+            timeout=(10, 30),
         )
 
         if r.status_code != 200:
@@ -805,6 +811,7 @@ class TradeRepublicApi:
             url=f"{self._host}/api/v1/user/costtransparency?instrumentId={isin}&exchangeId={exchange}&mode={order_mode}&type={order_type}&size={size}&sellFractions={sell_fractions}",
             data=None,
             headers=self._default_headers,
+            timeout=(10, 30),
         ).text
 
     def savings_plan_cost(self, isin, amount, interval):
@@ -813,6 +820,7 @@ class TradeRepublicApi:
             url=f"{self._host}/api/v1/user/savingsplancosttransparency?instrumentId={isin}&amount={amount}&interval={interval}",
             data=None,
             headers=self._default_headers,
+            timeout=(10, 30),
         ).text
 
     def __getattr__(self, name):

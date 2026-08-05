@@ -480,7 +480,7 @@ class DL:
             else:
                 self.doc_urls.append(doc_url_base)
 
-            future = self.session.get(doc_url)  # type: ignore[union-attr]
+            future = self.session.get(doc_url, timeout=(10, 30))  # type: ignore[union-attr]
             future.filepath = filepath  # type: ignore[attr-defined]
             future.doc_url_base = doc_url_base  # type: ignore[attr-defined]
             self.futures.append(future)  # type: ignore[arg-type]
