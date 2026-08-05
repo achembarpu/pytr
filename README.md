@@ -119,6 +119,16 @@ procedure will log you out from your mobile device.
 If no arguments are supplied pytr will look for them in the file `~/.pytr/credentials` (the first line must contain
 the phone number, the second line the pin). If the file doesn't exist pytr will ask for for the phone number and pin.
 
+**Security note:** Passing your PIN or phone number via `--pin` / `--phone_no` exposes them in the process list and
+shell history. Use environment variables or interactive input instead.
+
+**Environment variables (recommended for automation):**
+
+- `PYTR_PHONE` — your TradeRepublic phone number in international format (e.g. `+491234567890`)
+- `PYTR_PIN` — your TradeRepublic PIN
+
+Precedence: CLI arguments > environment variables > stored credentials (`~/.pytr/credentials` or system keyring) > interactive prompt.
+
 ## Development
 
 ### Setting Up a Development Environment

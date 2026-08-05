@@ -29,31 +29,57 @@ def get_settings(tr):
 def login(phone_no=None, pin=None, store_credentials=False, waf_token="playwright"):
     """
     Handle credentials parameters and store to credentials file if requested.
-    If no parameters are set but are needed then ask for input
+    If no parameters are set but are needed then ask for input.
+
+    Credential precedence (highest to lowest):
+      1. Explicit CLI arguments (phone_no / pin parameters)
+      2. Environment variables (PYTR_PHONE / PYTR_PIN)
+      3. Stored credentials (system keyring, then legacy file ~/.pytr/credentials)
+      4. Interactive prompt (stdin / getpass)
     """
     log = get_logger(__name__)
     save_cookies = True
     read_from_stored = False
 
+    # ---- Step 1: Environment variables (safer than CLI args) ----
     if phone_no is None:
-        # Try the system keyring first, then fall back to the legacy file.
+        phone_no = os.environ.get("PYTR_PHONE")
+        if phone_no:
+            log.debug("Using phone number from PYTR_PHONE environment variable")
+    if pin is None:
+        pin = os.environ.get("PYTR_PIN")
+        if pin:
+            log.debug("Using PIN from PYTR_PIN environment variable")
+
+    # ---- Step 2: Stored credentials (keyring, then legacy file) ----
+    # Read stored credentials whenever at least one credential is still missing.
+    stored_phone = None
+    stored_pin = None
+    if phone_no is None or pin is None:
         keyring_creds = _read_credentials_from_keyring()
         if keyring_creds is not None:
-            phone_no, pin = keyring_creds
-            phone_no_masked = phone_no[:-8] + "********"
-            pin_masked = len(pin) * "*"
+            stored_phone, stored_pin = keyring_creds
+            phone_no_masked = stored_phone[:-8] + "********"
+            pin_masked = len(stored_pin) * "*"
             log.debug("Using credentials from system keyring. Phone: %s, PIN: %s", phone_no_masked, pin_masked)
             read_from_stored = True
         elif CREDENTIALS_FILE.is_file():
             with open(CREDENTIALS_FILE) as f:
                 lines = f.readlines()
-            phone_no = lines[0].strip()
-            pin = lines[1].strip()
-            phone_no_masked = phone_no[:-8] + "********"
-            pin_masked = len(pin) * "*"
+            stored_phone = lines[0].strip()
+            stored_pin = lines[1].strip()
+            phone_no_masked = stored_phone[:-8] + "********"
+            pin_masked = len(stored_pin) * "*"
             log.debug("Using credentials from legacy file %s. Phone: %s, PIN: %s", CREDENTIALS_FILE, phone_no_masked, pin_masked)
             read_from_stored = True
 
+    # Keep CLI/env values when they are already set; only fill in missing ones.
+    if phone_no is None:
+        phone_no = stored_phone
+    if pin is None:
+        pin = stored_pin
+
+    # ---- Step 3: Interactive prompts (last resort) ----
     BASE_DIR.mkdir(parents=True, exist_ok=True)
     if phone_no is None:
         print("Please enter your TradeRepublic phone number in the format +4912345678:")

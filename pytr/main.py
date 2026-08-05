@@ -510,6 +510,17 @@ def main():
     args = parser.parse_args()
     # print(vars(args))
 
+    # Security: warn when credentials are passed on the command line because
+    # they are visible in the process list and shell history (CWE-214).
+    # Environment variables (PYTR_PHONE / PYTR_PIN) or interactive input
+    # are safer alternatives.
+    if hasattr(args, "phone_no") and (args.phone_no or args.pin):
+        print(
+            "PIN/phone provided on the command line are visible in the process list; "
+            "consider PYTR_PIN/PYTR_PHONE environment variables or interactive input.",
+            file=sys.stderr,
+        )
+
     log = get_logger(__name__, args.verbosity, args.debug_logfile, args.debug_log_filter)
     if args.verbosity.upper() == "DEBUG":
         log.debug("logging is set to debug")

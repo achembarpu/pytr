@@ -264,3 +264,196 @@ class TestLoginInMemoryPath:
         MockApi.assert_called_once()
         _, kwargs = MockApi.call_args
         assert kwargs["save_cookies"] is False
+
+
+# ---------------------------------------------------------------------------
+# Tests for environment variable precedence
+# ---------------------------------------------------------------------------
+
+
+class TestLoginEnvVars:
+    """Credentials from PYTR_PHONE / PYTR_PIN have lower precedence than CLI
+    args but higher precedence than stored credentials."""
+
+    ENV_PHONE = "+491234567890"
+    ENV_PIN = "9999"
+    STORED_PHONE = "+499999999999"
+    STORED_PIN = "0000"
+
+    def test_env_vars_used_when_no_cli_args(self, tmp_path, monkeypatch):
+        """PYTR_PHONE / PYTR_PIN are used when no CLI args are given."""
+        base = tmp_path / ".pytr"
+        monkeypatch.setattr("pytr.account.BASE_DIR", base)
+        monkeypatch.setattr("pytr.account.CREDENTIALS_FILE", base / "credentials")
+        monkeypatch.setenv("PYTR_PHONE", self.ENV_PHONE)
+        monkeypatch.setenv("PYTR_PIN", self.ENV_PIN)
+
+        with patch("pytr.account._read_credentials_from_keyring", return_value=None):
+            with patch("pytr.account.TradeRepublicApi") as MockApi:
+                with patch("pytr.account.get_settings"):
+                    login()
+
+        MockApi.assert_called_once()
+        _, kwargs = MockApi.call_args
+        assert kwargs["phone_no"] == self.ENV_PHONE
+        assert kwargs["pin"] == self.ENV_PIN
+
+    def test_cli_args_override_env_vars(self, tmp_path, monkeypatch):
+        """Explicit CLI arguments take precedence over env vars."""
+        base = tmp_path / ".pytr"
+        monkeypatch.setattr("pytr.account.BASE_DIR", base)
+        monkeypatch.setattr("pytr.account.CREDENTIALS_FILE", base / "credentials")
+        monkeypatch.setenv("PYTR_PHONE", self.ENV_PHONE)
+        monkeypatch.setenv("PYTR_PIN", self.ENV_PIN)
+
+        cli_phone = "+498888888888"
+        cli_pin = "8888"
+
+        with patch("pytr.account.TradeRepublicApi") as MockApi:
+            with patch("pytr.account.get_settings"):
+                login(phone_no=cli_phone, pin=cli_pin)
+
+        MockApi.assert_called_once()
+        _, kwargs = MockApi.call_args
+        assert kwargs["phone_no"] == cli_phone
+        assert kwargs["pin"] == cli_pin
+
+    def test_env_vars_override_stored_credentials(self, tmp_path, monkeypatch):
+        """Env vars take precedence over keyring / legacy file."""
+        base = tmp_path / ".pytr"
+        base.mkdir()
+        cred_file = base / "credentials"
+        cred_file.write_text(f"{self.STORED_PHONE}\n{self.STORED_PIN}\n")
+        monkeypatch.setattr("pytr.account.BASE_DIR", base)
+        monkeypatch.setattr("pytr.account.CREDENTIALS_FILE", cred_file)
+        monkeypatch.setenv("PYTR_PHONE", self.ENV_PHONE)
+        monkeypatch.setenv("PYTR_PIN", self.ENV_PIN)
+
+        with patch("pytr.account._read_credentials_from_keyring", return_value=None):
+            with patch("pytr.account.TradeRepublicApi") as MockApi:
+                with patch("pytr.account.get_settings"):
+                    login()
+
+        MockApi.assert_called_once()
+        _, kwargs = MockApi.call_args
+        assert kwargs["phone_no"] == self.ENV_PHONE
+        assert kwargs["pin"] == self.ENV_PIN
+
+    def test_env_phone_only_pin_from_stored(self, tmp_path, monkeypatch):
+        """When only PYTR_PHONE is set, the PIN is taken from stored credentials."""
+        base = tmp_path / ".pytr"
+        base.mkdir()
+        cred_file = base / "credentials"
+        cred_file.write_text(f"{self.STORED_PHONE}\n{self.STORED_PIN}\n")
+        monkeypatch.setattr("pytr.account.BASE_DIR", base)
+        monkeypatch.setattr("pytr.account.CREDENTIALS_FILE", cred_file)
+        monkeypatch.setenv("PYTR_PHONE", self.ENV_PHONE)
+        monkeypatch.delenv("PYTR_PIN", raising=False)
+
+        with patch("pytr.account._read_credentials_from_keyring", return_value=None):
+            with patch("pytr.account.TradeRepublicApi") as MockApi:
+                with patch("pytr.account.get_settings"):
+                    login()
+
+        MockApi.assert_called_once()
+        _, kwargs = MockApi.call_args
+        assert kwargs["phone_no"] == self.ENV_PHONE
+        # PIN falls back to stored credentials because PYTR_PIN is not set.
+        assert kwargs["pin"] == self.STORED_PIN
+
+    def test_env_pin_only_phone_from_stored(self, tmp_path, monkeypatch):
+        """When only PYTR_PIN is set, the phone number is taken from stored credentials."""
+        base = tmp_path / ".pytr"
+        base.mkdir()
+        cred_file = base / "credentials"
+        cred_file.write_text(f"{self.STORED_PHONE}\n{self.STORED_PIN}\n")
+        monkeypatch.setattr("pytr.account.BASE_DIR", base)
+        monkeypatch.setattr("pytr.account.CREDENTIALS_FILE", cred_file)
+        monkeypatch.delenv("PYTR_PHONE", raising=False)
+        monkeypatch.setenv("PYTR_PIN", self.ENV_PIN)
+
+        with patch("pytr.account._read_credentials_from_keyring", return_value=None):
+            with patch("pytr.account.TradeRepublicApi") as MockApi:
+                with patch("pytr.account.get_settings"):
+                    login()
+
+        MockApi.assert_called_once()
+        _, kwargs = MockApi.call_args
+        assert kwargs["phone_no"] == self.STORED_PHONE
+        assert kwargs["pin"] == self.ENV_PIN
+
+    def test_stored_skipped_when_both_env_vars_set(self, tmp_path, monkeypatch):
+        """When both env vars are set, stored credentials are not read."""
+        base = tmp_path / ".pytr"
+        monkeypatch.setattr("pytr.account.BASE_DIR", base)
+        monkeypatch.setattr("pytr.account.CREDENTIALS_FILE", base / "credentials")
+        monkeypatch.setenv("PYTR_PHONE", self.ENV_PHONE)
+        monkeypatch.setenv("PYTR_PIN", self.ENV_PIN)
+
+        with patch("pytr.account._read_credentials_from_keyring") as mock_read:
+            with patch("pytr.account.TradeRepublicApi"):
+                with patch("pytr.account.get_settings"):
+                    login()
+            # Stored credentials should not have been consulted because both
+            # env vars satisfied the requirement.
+            mock_read.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Tests for CLI-args security warning
+# ---------------------------------------------------------------------------
+
+
+class TestCliArgsWarning:
+    """When --phone_no or --pin are passed on the command line, main()
+    emits a visible warning to stderr (CWE-214 mitigation)."""
+
+    def test_phone_no_triggers_warning(self, monkeypatch, capsys):
+        """Warning is printed to stderr when --phone_no is passed."""
+        import sys
+
+        from pytr.main import main
+
+        monkeypatch.setattr(sys, "argv", ["pytr", "login", "-n", PHONE])
+        with patch("pytr.main.login"):
+            with patch("pytr.main.get_logger"):
+                try:
+                    main()
+                except SystemExit:
+                    pass
+        captured = capsys.readouterr()
+        assert "process list" in captured.err, f"stderr was: {captured.err!r}"
+        assert PHONE not in captured.err, "warning must not contain the credential value"
+
+    def test_pin_triggers_warning(self, monkeypatch, capsys):
+        """Warning is printed to stderr when --pin is passed."""
+        import sys
+
+        from pytr.main import main
+
+        monkeypatch.setattr(sys, "argv", ["pytr", "login", "-p", PIN])
+        with patch("pytr.main.login"):
+            with patch("pytr.main.get_logger"):
+                try:
+                    main()
+                except SystemExit:
+                    pass
+        captured = capsys.readouterr()
+        assert "process list" in captured.err, f"stderr was: {captured.err!r}"
+        assert PIN not in captured.err, "warning must not contain the credential value"
+
+    def test_no_warning_without_cli_creds(self, monkeypatch, capsys):
+        """No warning when credentials are not passed on the command line."""
+        import sys
+
+        from pytr.main import main
+
+        monkeypatch.setattr(sys, "argv", ["pytr", "login"])
+        with patch("pytr.main.login"):
+            with patch("pytr.main.get_logger"):
+                try:
+                    main()
+                except SystemExit:
+                    pass
+        captured = capsys.readouterr()
+        assert "process list" not in captured.err, f"stderr was: {captured.err!r}"
